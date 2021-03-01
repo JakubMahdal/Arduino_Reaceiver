@@ -1,0 +1,97 @@
+#include <stdint.h>
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+#include <Servo.h> 
+
+#define CE 10  // SPI CS
+#define CSN 9
+
+#define PIN_SERVO 3
+
+RF24 radio(CE, CSN);
+const byte prijimacAuto[]= "00001";
+Servo ZataceniServo;
+
+int EnA = 2;
+int In1 = 8;
+int In2 = 4;
+int EnB = 7;
+int In3 = 5;
+int In4 = 6;
+
+static int JoystickX = 0;
+static int JoystickY = 0;
+static bool OverTakeMode = false;
+
+
+void setup() 
+{
+    Serial.begin(9600);
+    ZataceniServo.attach(PIN_SERVO);
+    radio.begin();
+    radio.openReadingPipe(0, prijimacAuto);
+    radio.setPALevel(RF24_PA_LOW);
+    radio.startListening();
+
+    pinMode(EnA,OUTPUT);
+    pinMode(In1,OUTPUT);
+    pinMode(In2,OUTPUT);
+    pinMode(EnB,OUTPUT);
+    pinMode(In3,OUTPUT);
+    pinMode(In4,OUTPUT);
+
+}
+
+void overTakeMetoda(bool on,int rychlostPrvnihoMotoru)
+{
+    if(on == true)
+    {
+        digitalWrite(In3, HIGH);
+        digitalWrite(In4, LOW);
+        analogWrite(EnB, rychlostPrvnihoMotoru);
+    }
+    
+    if(on == false)
+    {
+        digitalWrite(In3, LOW);
+        digitalWrite(In4, LOW);
+        analogWrite(EnB, 0);
+    }
+}
+
+void loop() {
+   
+        if(radio.available())
+        {
+            while(radio.available())
+            {
+                //EnA,In1,In2 = Motor
+                radio.read(&OverTakeMode, sizeof(OverTakeMode));
+                radio.read(&JoystickX, sizeof(JoystickX));
+                radio.read(&JoystickY, sizeof(JoystickY));
+            }
+
+        }
+    Serial.println('Y');
+    Serial.println(JoystickY);
+    Serial.println('X');
+    Serial.println(JoystickX);
+    ZataceniServo.write(JoystickX);
+    if(JoystickY >= 0)
+    {
+        digitalWrite(In1, HIGH);
+        digitalWrite(In2, LOW);
+        analogWrite(EnA, JoystickY * 10);
+        overTakeMetoda(OverTakeMode, JoystickY * 10);
+    }
+
+    if(JoystickY < 0)
+    {
+        digitalWrite(In2, HIGH);
+        digitalWrite(In1, LOW);
+        analogWrite(EnA, JoystickY * (-10));
+        overTakeMetoda(false, JoystickY * 10);
+    }
+    
+}
